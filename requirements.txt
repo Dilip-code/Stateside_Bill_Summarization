@@ -1,0 +1,14 @@
+requests 
+beautifulsoup4 
+pdf2image 
+pytesseract 
+openai 
+streamlit 
+PyMuPDF 
+numpy
+fastapi 
+uvicorn 
+openpyxl
+python-dotenv
+together
+xlsxwriter
