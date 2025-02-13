@@ -15,6 +15,32 @@ client = Together(api_key=together_api_key)
 
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'  
 
+
+def clean_summary(text):
+    """Cleans the summary by removing instructions and markdown-style bold formatting."""
+    if not text:
+        return ""
+
+    # List of instruction phrases to remove
+    instruction_phrases = [
+        "Here is a 2-paragraph extractive summary of the text:",
+        "Here is a 2-paragraph abstractive summary of the provided text:",
+        "Here are the highlights in 15-20 bullet points under 4 headings:",
+        "Here is a 2-paragraph abstractive summary of the text:"
+    ]
+
+    # Remove instruction phrases at the beginning
+    for phrase in instruction_phrases:
+        if text.startswith(phrase):
+            text = text[len(phrase):].lstrip()
+
+    # Remove markdown-like bold formatting (**text**)
+    text = text.replace("**", "").replace("### ", "")
+
+    return text.strip()
+
+
+
 def ensure_folder_exists(folder_name):
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
@@ -89,6 +115,7 @@ def extract_text_from_webpage(url):
         return ""
 
 def query_together_ai(prompt):
+    """Generates a summary using Together AI and cleans it before returning."""
     try:
         response = client.chat.completions.create(
             model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
@@ -99,22 +126,25 @@ def query_together_ai(prompt):
         for token in response:
             if hasattr(token, 'choices'):
                 result += token.choices[0].delta.content
-        return result
+        
+        return clean_summary(result)  # Clean summary before returning
     except Exception as e:
         return None
+
 
 def generate_summaries_with_together_ai(combined_text, num_pages):
     extractive_prompt = f"Generate an extractive summary with {min(num_pages, 4)} paragraphs:\n\n{combined_text}"
     abstractive_prompt = f"Generate an abstractive summary in 2 paragraphs:\n\n{combined_text}"
     highlights_prompt = f"Generate highlights in 15-20 bullet points under 4 headings:\n\n{combined_text}"
     
-    return (
-        query_together_ai(extractive_prompt),
-        query_together_ai(abstractive_prompt),
-        query_together_ai(highlights_prompt),
-    )
+    extractive = query_together_ai(extractive_prompt)
+    abstractive = query_together_ai(abstractive_prompt)
+    highlights = query_together_ai(highlights_prompt)
 
-st.title("PDF and Webpage Summarization with Together AI")
+    return extractive, abstractive, highlights
+
+
+st.title("Stateside Bill Summarization")
 
 option = st.radio("Choose an option:", ("Upload a PDF", "Input a website link", "Upload an Excel file"))
 
@@ -212,9 +242,9 @@ elif option == "Upload an Excel file":
                             all_text = "".join([extract_text_from_image(img) for img in image_paths])
                             summaries = generate_summaries_with_together_ai(all_text, num_pages)
                             
-                            extractive_summary = summaries[0] or "N/A"
-                            abstractive_summary = summaries[1] or "N/A"
-                            highlights_summary = summaries[2] or "N/A"
+                            extractive_summary = clean_summary(summaries[0]) or "N/A"
+                            abstractive_summary = clean_summary(summaries[1]) or "N/A"
+                            highlights_summary = clean_summary(summaries[2]) or "N/A"
                 
                 else:  # Webpage URL
                     webpage_text = extract_text_from_webpage(url)
@@ -222,9 +252,9 @@ elif option == "Upload an Excel file":
                     if webpage_text.strip():
                         summaries = generate_summaries_with_together_ai(webpage_text, 3)
                         
-                        extractive_summary = summaries[0] or "N/A"
-                        abstractive_summary = summaries[1] or "N/A"
-                        highlights_summary = summaries[2] or "N/A"
+                        extractive_summary = clean_summary(summaries[0]) or "N/A"
+                        abstractive_summary = clean_summary(summaries[1]) or "N/A"
+                        highlights_summary = clean_summary(summaries[2]) or "N/A"
                 
                 results.append({
                     "BillState": bill_state,
